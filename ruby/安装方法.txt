@@ -1,0 +1,238 @@
+http://www.iteye.com/topic/43228/
+
+在 Linux 平台上安装和配置 Ruby on Rails 详解
+ 
+ruby on rails推荐的生产运行环境是Linux/FreeBSD/Unix，即Unix系列的操作系统，采用lighttpd＋FCGI的解决方案。以下我将以Linux操作系统，lighttpd＋FCGI，MySQL数据库为例，从源代码编译安装开始讲解。
+ 
+在安装之前，应该确认Linux操作系统已经安装好gcc编译器，否则请用Linux安装光盘先行安装gcc编译器：
+gcc –v
+如能返回gcc版本号，则gcc正确安装。
+ 
+一、安装 Ruby 解析器
+ 
+一些Linux发行版本，MacOSX操作系统都自带Ruby解析器，但是我仍然建议自行下载ruby源代码编译安装。因为一方面可以自己定制ruby安装的路径，另一方面可以在编译过程中自行添加更多的特性。
+ 
+ruby的源代码可以从Ruby官方网站下载：
+http://www.ruby-lang.org/en/downloads/
+ 
+下载源代码包到本地Linux主机，然后解压缩，进入该目录，进行配置，编译和安装：
+tar xzvf ruby-1.8.5.tar.gz
+cd ruby-1.8.5
+./configure –prefix=/usr/local/ruby
+make && make install
+如果想浏览所有的configure参数，可以：
+./configure –help |more
+如果不定制安装的目录，默认将安装到/usr/local目录下面。然而我建议自行定制一个ruby的安装目录，例如/usr/local/ruby，这样便于以后的升级，不会和操作系统其他软件混在一起。
+ 
+安装好以后，修改操作系统PATH路径，加入/usr/local/ruby/bin：
+export PATH=/usr/local/ruby/bin:$PATH
+将我们自己安装的ruby放在系统PATH前面，避免操作系统自带的ruby造成的干扰。在Linux上，一般将设置放在/etc/profile中，便于对全局生效。
+ 
+二、安装 ruby on rails
+ 
+在安装rails之前，要先安装rubygems。rubygems是ruby的在线包管理工具，可以从rubyforge下载rubygems：
+http://rubyforge.org/projects/rubygems/
+下载好源代码包，解压缩，安装：
+tar xzvf rubygems-0.9.0.tgz
+cd rubygems-0.9.0/
+ruby setup.rb
+ 
+然后就可以安装rails了，在确认服务器已经连接互联网的情况下执行：
+gem install rails –y
+即通过gem从rubyforge网站下载rails所有依赖包安装。
+ 
+安装好rails以后，可以执行：
+rails –v
+确认一下rails的版本。
+ 
+ 
+三、安装 ruby 的数据库适配器
+ 
+rails发行包中已经自带纯ruby的MySQL数据库适配器，然而对于生产环境来说，我们仍然应该下载安装C版本的数据库适配器，以达到更好的性能。下载mysql-ruby-2.7.3.tar.gz：
+http://www.tmtm.org/en/mysql/ruby/
+tar xzvf mysql-ruby-2.7.3.tar.gz
+cd mysql-ruby-2.7.3
+ruby extconf.rb --with-mysql-dir=/opt/mysql5
+make && make install
+注意--with-mysql-dir应该指向MySQL数据库的安装路径，如果数据库服务器和Web服务器不在同一台机器上，那么Web服务器上也必须安装MySQL软件，因为ruby的C版本MySQL适配器需要在编译的时候联接MySQL的系统库。
+ 
+ 
+四、安装 Ruby 的 FCGI 支持
+ 
+由于ruby的fcgi支持库需要在编译的时候联接FCGI的系统库，因此我们需要先安装FCGI库，下载FCGI源代码发行包：
+http://www.fastcgi.com/dist/
+tar xzvf fcgi-2.4.0.tar.gz
+cd fcgi-2.4.0
+./configure --prefix=/usr/local/fcgi
+make && make install
+同样，将fcgi安装在自己指定的目录下，而不是默认的/usr/local，避免多个软件混在一起。
+ 
+然后就可以安装ruby的fcgi支持库了，下载ruby-fcgi-0.8.7.tar.gz：
+http://rubyforge.org/projects/fcgi/
+tar xzvf ruby-fcgi-0.8.7.tar.gz
+cd ruby-fcgi-0.8.7
+ruby install.rb config -- --with-fcgi-include=/usr/local/fcgi/include --with-fcgi-lib=/usr/local/fcgi/lib
+ruby install.rb setup
+ruby install.rb install
+ 
+五、安装 lighttpd Web Server
+ 
+安装 Lighttpd
+ 
+在安装lighttpd之前，应该确认操作系统已经安装pcre，即Perl兼容的规则表达式库：
+rpm –qa |grep pcre
+如果没有，请从Linux安装光盘里面安装。
+ 
+然后下载lighttpd：
+http://www.lighttpd.net/download/
+tar xzvf lighttpd-1.4.13.tar.gz
+cd lighttpd-1.4.13
+./configure --prefix=/usr/local/lighttpd
+ 
+configure完毕以后，会给出一个激活的模块和没有激活模块的清单，可以检查一下，是否自己需要的模块都已经激活，在enable的模块中一定要有“mod_rewrite”这一项，否则重新检查pcre是否安装。然后编译安装：
+make && make install
+ 
+编译后配置：
+cp doc/sysconfig.lighttpd /etc/sysconfig/lighttpd
+mkdir /etc/lighttpd
+cp doc/lighttpd.conf /etc/lighttpd/lighttpd.conf
+ 
+如果你的Linux是RedHat/CentOS，那么：
+cp doc/rc.lighttpd.redhat /etc/init.d/lighttpd
+如果你的Linux是SuSE，那么：
+cp doc/rc.lighttpd /etc/init.d/lighttpd
+如果你的Linux是ubuntu，那么需要自己创建启动脚本，lighttpd官方wiki上面已经给出来该脚本，地址在：
+http://redmine.lighttpd.net/wiki/1/ScriptsUbuntu
+
+其他Linux发行版本可以自行参考该文件内容进行修改，或者自己写一个控制脚本，也不过举手之劳：
+
+C代码  
+#!/bin/sh  
+  
+case "$1" in   
+  start)           
+    /usr/local/lighttpd/sbin/lighttpd -f /etc/lighttpd/lighttpd.conf > /dev/null 2>&1  
+    ;;  
+  stop)   
+    killall lighttpd  
+    ;;  
+  restart)   
+   $0 stop  
+   sleep 1  
+   $0 start   
+   ;;  
+  *)   
+  echo "Usage: lighttpd.sh {start|stop|restart}"   
+  ;;   
+esac  
+  
+exit 0   
+ 
+然后修改/etc/init.d/lighttpd，把
+LIGHTTPD_BIN=/usr/sbin/lighttpd
+改为
+LIGHTTPD_BIN=/usr/local/lighttpd/sbin/lighttpd
+ 
+此脚本用来控制lighttpd的启动关闭和重起：
+/etc/init.d/lighttpd start
+/etc/init.d/lighttpd stop
+/etc/init.d/lighttpd restart
+ 
+如果你希望服务器启动的时候就启动lighttpd，那么：
+chkconfig lighttpd on
+ 
+这样lighttpd就安装好了，接下来需要配置lighttpd。
+ 
+配置 Lighttpd
+ 
+修改/etc/lighttpd/lighttpd.conf
+ 
+1）server.modules
+取消需要用到模块的注释，mod_rewrite，mod_access，mod_fastcgi，mod_simple_vhost，mod_cgi，mod_compress，mod_accesslog是一般需要用到的。
+ 
+2）server.document-root, server.error-log，accesslog.filename需要指定相应的目录
+ 
+3）用什么权限来运行lighttpd
+server.username            = "nobody"
+server.groupname           = "nobody"
+从安全角度来说，不建议用root权限运行web server，可以自行指定普通用户权限。
+ 
+4）静态文件压缩
+compress.cache-dir         = "/tmp/lighttpd/cache/compress"
+compress.filetype          = ("text/plain", "text/html","text/javascript","text/css")
+可以指定某些静态资源类型使用压缩方式传输，节省带宽，对于大量AJAX应用来说，可以极大提高页面加载速度。
+ 
+5）配置ruby on rails
+ 
+最简单的配置如下：
+$HTTP["host"] == "www.xxx.com" {
+ server.document-root = "/yourrails/public"
+ server.error-handler-404 = "/dispatch.fcgi"
+ fastcgi.server = (".fcgi" =>
+    ("localhost" =>
+      ("min-procs" => 10,
+       "max-procs" => 10,
+       "socket" => "/tmp/lighttpd/socket/rails.socket",
+       "bin-path" => "/yourrails/public/dispatch.fcgi",
+       "bin-environment" => ("RAILS_ENV" => "production")
+      )
+    )
+ )
+}
+即由lighttpd启动10个FCGI进程，lighttpd和FCGI之间使用本机Unix Socket通信。
+ 
+Lighttpd的FAQ：无法启动Ruby on Rails
+ 
+FastCGI的启动脚本位于Rails应用目录下面public/dispatch.fcgi，如果无法启动Lighttpd，报告FastCGI错误，你可以尝试着手工运行该脚本cd public && ./dispatch.fcgi，看看是否可以运行。一般来说，很多人都是在Windows下面创建Rails项目，导致dispatch.fcgi脚本的ruby运行路径指向windows下面的ruby，部署到Linux上面就无法运行了，另外一方面Windows上面创建的Rails项目在Linux上面dispatch.fcgi没有可执行权限，所以也需要授予可执行权限。
+ 
+ 
+六、安装 ImageMagick 和 RMagic
+ 
+RMagic是ruby处理图片需要用到的库，很多ruby应用由于都涉及图片处理的功能，往往需要依赖RMagic，但安装ImageMagick和RMagic相当烦琐，需要特别的说明。
+ 
+安装 ImageMagick
+http://www.imagemagick.org
+ImageMagick是用C语言实现的图形处理库，有Unix版本和Windows版本。对于Unix版本来说，安装比较麻烦些，另外不建议安装ImageMagick二进制版本，往往会导致缺少某些图片处理功能，导致RMagic安装失败。下载ImageMagick源代码，解压缩，配置：
+tar xzvf ImageMagick-6.2.9-0.tar.gz
+cd tar xzvf ImageMagick-6.2.9
+./configure --prefix=/usr/local/ImageMagick
+ 
+观察配置后给出来的支持图形格式，看看该图形格式支持是否是yes，如果不是，那么必须先安装该图形格式的本地库。例如，你应该检查是否已经安装如下rpm包：
+rpm –qa |grep libpng
+rpm –qa |grep libpng-devel
+rpm –qa |grep libjpeg
+rpm –qa |grep gd-devel
+如果你希望支持tiff格式，还应该检查
+rpm –qa |grep libtiff
+如果没有安装，那么在Linux安装光盘找到相应rpm包安装上，再次configure直到确认需要的图形格式全部支持为止，然后编译安装：
+make && make install
+ 
+由于ImageMagic被安装在我们自行指定的/usr/local/ImageMagick，后面安装RMagic会找不到需要用到的ImageMagic的命令和库，因此需要配置一下操作系统：
+ 
+编辑/etc/profile里面的PATH环境变量，在最后面加入：
+export PATH=/usr/local/ruby/bin:/usr/local/ImageMagick/bin:$PATH
+ 
+编辑/etc/ld.so.conf，加入：
+/usr/local/ImageMagick/lib
+执行命令：
+ldconfig
+将ImageMagick的库加入系统联接库
+ 
+然后注销当前用户重新登录，便于环境变量修改生效，执行：
+convert logo: logo.gif
+看是否正确生成一个logo.gif的图片文件。
+ 
+安装 RMagic
+http://rubyforge.org/projects/rmagick/
+在rubyfoge上面下载RMagic的源代码发行包，不要下载gem包，然后解压缩编译：
+./configure
+make && make install
+ 
+如果配置和编译过程没有报错，即大功告成。
+ 
+对于MacOSX来说，安装RMagic以上步骤会出错，请参考：
+http://rmagick.rubyforge.org/install-osx.html
+ 
+总体来说，ImageMagick和RMagic的安装很容易出错，安装起来比较困难，如果碰到无法解决的问题，可以通过Google寻求解决办法。
+ 
+如果你在安装过程当中，遇到了什么问题，请看：Lighttpd和RoR安装配置的疑难解答
